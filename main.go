@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -25,9 +26,22 @@ func realMain() int {
 		port = p
 	}
 
+	msg := "hello"
+	if m, ok := os.LookupEnv("MESSAGE"); ok {
+		msg = m
+	}
+
+	meta := make(map[string]string)
+	for _, e := range os.Environ() {
+		pair := strings.SplitN(e, "=", 2)
+		if strings.HasPrefix(pair[0], "ECHO_SERVER_META_") {
+			meta[strings.TrimPrefix(pair[0], "ECHO_SERVER_META_")] = pair[1]
+		}
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	r.Get("/", handler)
+	r.Get("/", handler(msg, meta))
 
 	log.Printf("start http server: port is %s", port)
 	http.ListenAndServe(":"+port, r)
@@ -53,36 +67,43 @@ const tpl = `
 				{{end}}
 			</ul>
 		{{end}}
+
+		{{if ne (len .Meta) 0}}
+			<h2>Metadata</h2>
+			{{range $k, $v := .Meta}}
+				<li>{{$k}}={{$v}}</li>
+			{{end}}
+		{{end}}
 	</body>
 </html>`
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	msg := "hello"
-	if m, ok := os.LookupEnv("MESSAGE"); ok {
-		msg = m
-	}
+func handler(defaultMessage string, meta map[string]string) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		msg := defaultMessage
+		if m := r.URL.Query().Get("message"); m != "" {
+			msg = m
+		}
 
-	if m := r.URL.Query().Get("message"); m != "" {
-		msg = m
-	}
+		t, err := template.New("response").Parse(tpl)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-	t, err := template.New("response").Parse(tpl)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+		data := struct {
+			Message       string
+			RequestHeader http.Header
+			Meta          map[string]string
+		}{
+			Message:       msg,
+			RequestHeader: r.Header,
+			Meta:          meta,
+		}
 
-	data := struct {
-		Message       string
-		RequestHeader http.Header
-	}{
-		Message:       msg,
-		RequestHeader: r.Header,
-	}
-
-	err = t.Execute(w, data)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		err = t.Execute(w, data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }
