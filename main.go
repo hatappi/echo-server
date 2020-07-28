@@ -41,7 +41,7 @@ func realMain() int {
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
-	r.Get("/", handler(msg, meta))
+	r.Get("/*", handler(msg, meta))
 
 	log.Printf("start http server: port is %s", port)
 	http.ListenAndServe(":"+port, r)
@@ -56,6 +56,9 @@ const tpl = `
 		<title>Echo Server</title>
 	</head>
 	<body>
+		<h2>RequestPath</h2>
+		{{.RequestPath}}
+
 		<h2>Message</h2>
 		{{.Message}}
 		<h2>Request Header</h2>
@@ -92,10 +95,12 @@ func handler(defaultMessage string, meta map[string]string) func(http.ResponseWr
 
 		data := struct {
 			Message       string
+			RequestPath   string
 			RequestHeader http.Header
 			Meta          map[string]string
 		}{
 			Message:       msg,
+			RequestPath:   r.URL.Path,
 			RequestHeader: r.Header,
 			Meta:          meta,
 		}
