@@ -54,6 +54,7 @@ const tpl = `
 	<head>
 		<meta charset="UTF-8">
 		<title>Echo Server</title>
+		<link rel="icon" href="data:image/x-icon;,">
 	</head>
 	<body>
 		<h2>RequestPath</h2>
@@ -61,6 +62,14 @@ const tpl = `
 
 		<h2>Message</h2>
 		{{.Message}}
+
+		{{if ne (len .Meta) 0}}
+			<h2>Metadata</h2>
+			{{range $k, $v := .Meta}}
+				<li>{{$k}}={{$v}}</li>
+			{{end}}
+		{{end}}
+
 		<h2>Request Header</h2>
 		{{range $k, $arr := .RequestHeader}}
 			<div><b>{{$k}}</b></div>
@@ -69,13 +78,6 @@ const tpl = `
 					<li>{{.}}</li>
 				{{end}}
 			</ul>
-		{{end}}
-
-		{{if ne (len .Meta) 0}}
-			<h2>Metadata</h2>
-			{{range $k, $v := .Meta}}
-				<li>{{$k}}={{$v}}</li>
-			{{end}}
 		{{end}}
 	</body>
 </html>`
