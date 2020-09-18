@@ -56,6 +56,11 @@ const tpl = `
 		<meta charset="UTF-8">
 		<title>Echo Server</title>
 		<link rel="icon" href="data:image/x-icon;,">
+		{{if ne (len .Style) 0}}
+			<style type="text/css">
+			{{.Style}}
+			</style>
+		{{end}}
 	</head>
 	<body>
 		<h2>RequestPath</h2>
@@ -118,7 +123,21 @@ func handler(defaultMessage string, meta map[string]string) func(http.ResponseWr
 				return
 			}
 
-			err = t.Execute(w, data)
+			templateData := struct {
+				Message       string
+				RequestPath   string
+				RequestHeader http.Header
+				Meta          map[string]string
+				Style         template.CSS
+			}{
+				Message:       data.Message,
+				RequestPath:   data.RequestPath,
+				RequestHeader: data.RequestHeader,
+				Meta:          data.Meta,
+				Style:         template.CSS(os.Getenv("STYLE")),
+			}
+
+			err = t.Execute(w, templateData)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
