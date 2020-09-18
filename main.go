@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
@@ -82,6 +83,13 @@ const tpl = `
 	</body>
 </html>`
 
+type responseData struct {
+	Message       string            `json:"message"`
+	RequestPath   string            `json:"request_path"`
+	RequestHeader http.Header       `json:"request_header"`
+	Meta          map[string]string `json:"meta"`
+}
+
 func handler(defaultMessage string, meta map[string]string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		msg := defaultMessage
@@ -89,28 +97,32 @@ func handler(defaultMessage string, meta map[string]string) func(http.ResponseWr
 			msg = m
 		}
 
-		t, err := template.New("response").Parse(tpl)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		data := struct {
-			Message       string
-			RequestPath   string
-			RequestHeader http.Header
-			Meta          map[string]string
-		}{
+		data := &responseData{
 			Message:       msg,
 			RequestPath:   r.URL.Path,
 			RequestHeader: r.Header,
 			Meta:          meta,
 		}
 
-		err = t.Execute(w, data)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		if r.Header.Get("Content-Type") == "application/json" {
+			b, err := json.Marshal(data)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Write(b)
+		} else {
+			t, err := template.New("response").Parse(tpl)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			err = t.Execute(w, data)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 }
