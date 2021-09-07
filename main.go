@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -66,6 +67,9 @@ const tpl = `
 		<h2>RequestPath</h2>
 		{{.RequestPath}}
 
+		<h2>ClientIP</h2>
+		{{.ClientIP}}
+
 		<h2>Message</h2>
 		{{.Message}}
 
@@ -93,6 +97,7 @@ type responseData struct {
 	RequestPath   string            `json:"request_path"`
 	RequestHeader http.Header       `json:"request_header"`
 	Meta          map[string]string `json:"meta"`
+	ClientIP      string            `json:"client_ip"`
 }
 
 func handler(defaultMessage string, meta map[string]string) func(http.ResponseWriter, *http.Request) {
@@ -102,11 +107,18 @@ func handler(defaultMessage string, meta map[string]string) func(http.ResponseWr
 			msg = m
 		}
 
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		data := &responseData{
 			Message:       msg,
 			RequestPath:   r.URL.Path,
 			RequestHeader: r.Header,
 			Meta:          meta,
+			ClientIP:      ip,
 		}
 
 		if r.Header.Get("Content-Type") == "application/json" {
@@ -129,12 +141,14 @@ func handler(defaultMessage string, meta map[string]string) func(http.ResponseWr
 				RequestHeader http.Header
 				Meta          map[string]string
 				Style         template.CSS
+				ClientIP      string
 			}{
 				Message:       data.Message,
 				RequestPath:   data.RequestPath,
 				RequestHeader: data.RequestHeader,
 				Meta:          data.Meta,
 				Style:         template.CSS(os.Getenv("STYLE")),
+				ClientIP:      data.ClientIP,
 			}
 
 			err = t.Execute(w, templateData)
