@@ -45,8 +45,14 @@ func realMain() int {
 	r.Use(middleware.Logger)
 	r.Get("/*", handler(msg, meta))
 
-	log.Printf("start http server: port is %s", port)
-	http.ListenAndServe(":"+port, r)
+	host := ""
+	if h, ok := os.LookupEnv("ECHO_HOST"); ok {
+		host = h
+	}
+	addr := host + ":" + port
+
+	log.Printf("start http server: addr is %s", addr)
+	http.ListenAndServe(addr, r)
 	return exitOK
 }
 

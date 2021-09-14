@@ -1,7 +1,7 @@
 GO=go
 DOCKER=docker
 
-DOCKER_TAG ?= v0.5
+DOCKER_TAG ?= v0.7
 DOCKER_IMAGE_NAME=hatappi/echo-server:${DOCKER_TAG}
 
 .PHONY: build
