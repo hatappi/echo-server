@@ -86,6 +86,9 @@ const tpl = `
 			{{end}}
 		{{end}}
 
+		<h2>Host</h2>
+		<div>{{.Host}}</div>
+
 		<h2>Request Header</h2>
 		{{range $k, $arr := .RequestHeader}}
 			<div><b>{{$k}}</b></div>
@@ -102,6 +105,7 @@ type responseData struct {
 	Message       string            `json:"message"`
 	RequestPath   string            `json:"request_path"`
 	RequestHeader http.Header       `json:"request_header"`
+	Host          string            `json:"host"`
 	Meta          map[string]string `json:"meta"`
 	ClientIP      string            `json:"client_ip"`
 }
@@ -123,6 +127,7 @@ func handler(defaultMessage string, meta map[string]string) func(http.ResponseWr
 			Message:       msg,
 			RequestPath:   r.URL.Path,
 			RequestHeader: r.Header,
+			Host:          r.Host,
 			Meta:          meta,
 			ClientIP:      ip,
 		}
@@ -144,6 +149,7 @@ func handler(defaultMessage string, meta map[string]string) func(http.ResponseWr
 			templateData := struct {
 				Message       string
 				RequestPath   string
+				Host          string
 				RequestHeader http.Header
 				Meta          map[string]string
 				Style         template.CSS
@@ -152,6 +158,7 @@ func handler(defaultMessage string, meta map[string]string) func(http.ResponseWr
 				Message:       data.Message,
 				RequestPath:   data.RequestPath,
 				RequestHeader: data.RequestHeader,
+				Host:          data.Host,
 				Meta:          data.Meta,
 				Style:         template.CSS(os.Getenv("STYLE")),
 				ClientIP:      data.ClientIP,
