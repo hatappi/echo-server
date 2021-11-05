@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "github.com/hatappi/echo-server/pb";
+
+package echo;
+
+service Echo {
+  rpc SayHello (SayHelloRequest) returns (SayHelloReply) {}
+}
+
+message SayHelloRequest {
+  string name = 1;
+}
+
+message SayHelloReply {
+  string message = 1;
+}

@@ -1,4 +1,4 @@
-FROM golang:1.14.6-alpine3.12 AS builder
+FROM golang:1.16.3-alpine3.12 AS builder
 
 ENV GOPATH ""
 
@@ -7,7 +7,7 @@ RUN go mod download
 
 COPY . ./
 
-RUN go build -o /bin/echo-server main.go
+RUN go build -o /bin/echo-server .
 
 FROM alpine:3.12
 

@@ -12,3 +12,9 @@ $ curl localhost:3000
 # or
 $ curl localhost:3000?message=bar
 ```
+
+### gRPC
+
+```sh
+echo '{"name": "foo"}' | grpcurl call -k localhost:5000 echo.Echo.SayHello
+```
