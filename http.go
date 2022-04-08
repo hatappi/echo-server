@@ -52,7 +52,7 @@ func sayHelloHandler(metadata map[string]string, logger logr.Logger) func(http.R
 
 func runHTTPServer(addr string, metadata map[string]string, logger logr.Logger) error {
 	r := chi.NewRouter()
-	r.Get("/*", sayHelloHandler(metadata, logger))
+	r.HandleFunc("/*", sayHelloHandler(metadata, logger))
 
 	logger.Info("start HTTP server", "addr", addr)
 	if err := http.ListenAndServe(addr, r); err != nil {
