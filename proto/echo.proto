@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option go_package = "./;echo";
+
+package echo;
+
+service Echo {
+  rpc SayHello(SayHelloRequest) returns (SayHelloResponse) {}
+}
+
+message SayHelloRequest {
+  string name = 1;
+}
+
+message SayHelloResponse {
+  string body = 1;
+
+  map<string, string> request_metadata = 2;
+  map<string, string> response_metadata = 3;
+}

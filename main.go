@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/hatappi/go-kit/log/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -18,37 +20,42 @@ func main() {
 }
 
 func realMain() int {
-	ctx := context.Background()
+	logger, err := zap.NewLogger("echo-server")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to init logger. %s\n", err)
+		return exitNG
+	}
+
+	meta := make(map[string]string)
+	for _, e := range os.Environ() {
+		pair := strings.SplitN(e, "=", 2)
+		if strings.HasPrefix(pair[0], "ECHO_SERVER_META_") {
+			meta[strings.TrimPrefix(pair[0], "ECHO_SERVER_META_")] = pair[1]
+		}
+	}
 
 	host := ""
-	if h, ok := os.LookupEnv("ECHO_HOST"); ok {
+	if h, ok := os.LookupEnv("ECHO_SERVER_HOST"); ok {
 		host = h
 	}
 
+	ctx := context.Background()
 	wg, ctx := errgroup.WithContext(ctx)
 
 	httpPort := "3000"
-	if p, ok := os.LookupEnv("HTTP_PORT"); ok {
+	if p, ok := os.LookupEnv("ECHO_SERVER_HTTP_PORT"); ok {
 		httpPort = p
 	}
-	wg.Go(func() error { return runHTTPServer(fmt.Sprintf("%s:%s", host, httpPort)) })
+	wg.Go(func() error { return runHTTPServer(fmt.Sprintf("%s:%s", host, httpPort), meta, logger) })
 
 	grpcPort := "5000"
-	if p, ok := os.LookupEnv("GRPC_PORT"); ok {
+	if p, ok := os.LookupEnv("ECHO_SERVER_GRPC_PORT"); ok {
 		grpcPort = p
 	}
-	wg.Go(func() error { return runGRPCServer(fmt.Sprintf("%s:%s", host, grpcPort)) })
-
-	grpcTLSPort := os.Getenv("GRPC_TLS_PORT")
-	grpcTLSCrt := os.Getenv("GRPC_TLS_CRT")
-	grpcTLSKey := os.Getenv("GRPC_TLS_KEY")
-	fmt.Printf("%v\n", grpcTLSPort != "" && grpcTLSCrt != "" && grpcTLSKey != "")
-	if grpcTLSPort != "" && grpcTLSCrt != "" && grpcTLSKey != "" {
-		wg.Go(func() error { return runTLSGRPCServer(fmt.Sprintf("%s:%s", host, grpcTLSPort), grpcTLSCrt, grpcTLSKey) })
-	}
+	wg.Go(func() error { return runGRPCServer(fmt.Sprintf("%s:%s", host, grpcPort), meta, logger) })
 
 	if err := wg.Wait(); err != nil {
-		fmt.Fprintf(os.Stderr, "[ERROR] error received: %s\n", err)
+		logger.Error(err, "failed to run server")
 		return exitNG
 	}
 
