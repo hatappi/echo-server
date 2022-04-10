@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"sync"
 
 	"github.com/hatappi/go-kit/log/zap"
 	"golang.org/x/sync/errgroup"
@@ -42,17 +44,51 @@ func realMain() int {
 	ctx := context.Background()
 	wg, ctx := errgroup.WithContext(ctx)
 
+	httpServer := NewHTTPServer(meta, logger)
+
 	httpPort := "3000"
 	if p, ok := os.LookupEnv("ECHO_SERVER_HTTP_PORT"); ok {
 		httpPort = p
 	}
-	wg.Go(func() error { return runHTTPServer(fmt.Sprintf("%s:%s", host, httpPort), meta, logger) })
+	wg.Go(func() error { return httpServer.Run(fmt.Sprintf("%s:%s", host, httpPort)) })
+
+	grpcServer := NewGRPCServer(meta, logger)
 
 	grpcPort := "5000"
 	if p, ok := os.LookupEnv("ECHO_SERVER_GRPC_PORT"); ok {
 		grpcPort = p
 	}
-	wg.Go(func() error { return runGRPCServer(fmt.Sprintf("%s:%s", host, grpcPort), meta, logger) })
+	wg.Go(func() error { return grpcServer.Run(fmt.Sprintf("%s:%s", host, grpcPort)) })
+
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
+	defer cancel()
+
+	<-ctx.Done()
+
+	var shutdownWG sync.WaitGroup
+
+	shutdownWG.Add(2)
+
+	go func() {
+		logger.Info("start shutdown HTTP server")
+		// need to pass new context due to existing context is already done
+		if err := httpServer.Shutdown(context.Background()); err != nil {
+			logger.Error(err, "failed to shutdown HTTP server")
+		}
+		logger.Info("end shutdown HTTP server")
+
+		shutdownWG.Done()
+	}()
+
+	go func() {
+		logger.Info("start shutdown gRPC server")
+		grpcServer.Shutdown()
+		logger.Info("end shutdown gRPC server")
+
+		shutdownWG.Done()
+	}()
+
+	shutdownWG.Wait()
 
 	if err := wg.Wait(); err != nil {
 		logger.Error(err, "failed to run server")
