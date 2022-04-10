@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 
@@ -18,6 +20,7 @@ func sayHelloHandler(metadata map[string]string, logger logr.Logger) func(http.R
 
 		switch r.Method {
 		case http.MethodGet:
+		case http.MethodHead:
 			q := r.URL.Query()
 			req.Name = q.Get("name")
 		case http.MethodPost:
@@ -35,7 +38,7 @@ func sayHelloHandler(metadata map[string]string, logger logr.Logger) func(http.R
 			reqMeta[k] = strings.Join(vals, ",")
 		}
 
-		logger.Info("sayHello request received", "name", req.GetName(), "protocol", "HTTP")
+		logger.Info("sayHello request received", "name", req.GetName(), "protocol", r.Proto, "path", r.URL.Path, "method", r.Method)
 
 		resp := &pb.SayHelloResponse{
 			Body:             "Hello " + req.GetName(),
@@ -50,12 +53,44 @@ func sayHelloHandler(metadata map[string]string, logger logr.Logger) func(http.R
 	}
 }
 
-func runHTTPServer(addr string, metadata map[string]string, logger logr.Logger) error {
+type httpServer struct {
+	logger logr.Logger
+
+	server *http.Server
+}
+
+func NewHTTPServer(metadata map[string]string, logger logr.Logger) *httpServer {
 	r := chi.NewRouter()
 	r.HandleFunc("/*", sayHelloHandler(metadata, logger))
 
-	logger.Info("start HTTP server", "addr", addr)
-	if err := http.ListenAndServe(addr, r); err != nil {
+	server := &http.Server{
+		Handler: r,
+	}
+
+	return &httpServer{
+		logger: logger,
+
+		server: server,
+	}
+}
+
+func (hs *httpServer) Run(addr string) error {
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	hs.logger.Info("start HTTP server", "addr", addr)
+
+	if err := hs.server.Serve(lis); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+
+	return nil
+}
+
+func (hs *httpServer) Shutdown(ctx context.Context) error {
+	if err := hs.server.Shutdown(ctx); err != nil {
 		return err
 	}
 

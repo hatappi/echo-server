@@ -12,12 +12,12 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-type server struct {
+type echoServer struct {
 	metadata map[string]string
 	logger   logr.Logger
 }
 
-func (s *server) SayHello(ctx context.Context, in *pb.SayHelloRequest) (*pb.SayHelloResponse, error) {
+func (s *echoServer) SayHello(ctx context.Context, in *pb.SayHelloRequest) (*pb.SayHelloResponse, error) {
 	reqMeta := make(map[string]string)
 
 	meta, _ := metadata.FromIncomingContext(ctx)
@@ -34,21 +34,37 @@ func (s *server) SayHello(ctx context.Context, in *pb.SayHelloRequest) (*pb.SayH
 	}, nil
 }
 
-func runGRPCServer(addr string, metadata map[string]string, logger logr.Logger) error {
+type gRPCServer struct {
+	server *grpc.Server
+	logger logr.Logger
+}
+
+func NewGRPCServer(metadata map[string]string, logger logr.Logger) *gRPCServer {
+	s := grpc.NewServer()
+
+	pb.RegisterEchoServer(s, &echoServer{metadata: metadata, logger: logger})
+	reflection.Register(s)
+
+	return &gRPCServer{
+		server: s,
+		logger: logger,
+	}
+}
+
+func (gs *gRPCServer) Run(addr string) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 
-	s := grpc.NewServer()
-
-	pb.RegisterEchoServer(s, &server{metadata: metadata, logger: logger})
-	reflection.Register(s)
-
-	logger.Info("start gRPC server", "addr", addr)
-	if err := s.Serve(lis); err != nil {
+	gs.logger.Info("start gRPC server", "addr", addr)
+	if err := gs.server.Serve(lis); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (gs *gRPCServer) Shutdown() {
+	gs.server.GracefulStop()
 }
